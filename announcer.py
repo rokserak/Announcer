@@ -58,7 +58,7 @@ def announcer():
                                        f" \"{notification_title}\"'"
                 os.system(notification_command)
         current_bluetooth_state = new_bluetooth_state
-        sleep(1)
+        sleep(0.5)
 
 
 if __name__ == '__main__':
