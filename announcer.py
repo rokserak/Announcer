@@ -1,7 +1,8 @@
+import json
 import os
 from dataclasses import dataclass
 from time import sleep
-from typing import Dict
+from typing import Dict, List
 
 
 @dataclass
@@ -14,28 +15,30 @@ class BluetoothDevice:
 
 def get_bluetooth_devices() -> Dict[str, BluetoothDevice]:
     devices_dict = dict()
-    bluetooth_info = os.popen('system_profiler SPBluetoothDataType').read()
-    _, paired_devices_info = bluetooth_info.split('Paired Bluetooth Devices:\n')
-    paired_devices_info = paired_devices_info.replace('\n', '')
-    device_info_lines = paired_devices_info.split('          ')[1:]
-    device_info = dict()
-    for line in device_info_lines:
-        if line.startswith('    '):
-            line = line.replace('    ', '')
-            attr, attr_value = line.split(': ', maxsplit=1)
-            if attr == 'Minor Type':
-                device_info['minor_type'] = attr_value
-            elif attr == 'Connected' and attr_value == 'Yes':
-                device_info['connected'] = True
-            elif attr == 'Address':
-                device_info['mac_address'] = attr_value
-        else:
-            if device_info:
-                devices_dict[device_info.get('mac_address')] = BluetoothDevice(**device_info)
-                device_info = dict()
-            device_info['name'] = line.replace(':', '')
-    if device_info:
-        devices_dict[device_info.get('mac_address')] = BluetoothDevice(**device_info)
+    bluetooth_info = os.popen('system_profiler SPBluetoothDataType -json').read()
+    bluetooth_info_dict: Dict = json.loads(bluetooth_info)
+
+    connected_devices: List[Dict[str, Dict[str, str]]] = bluetooth_info_dict.get('SPBluetoothDataType')[0] \
+        .get('device_connected')
+    not_connected_devices: List[Dict[str, Dict[str, str]]] = bluetooth_info_dict.get('SPBluetoothDataType')[0] \
+        .get('device_not_connected')
+
+    if connected_devices is not None:
+        for device in connected_devices:
+            for device_name, device_info in device.items():
+                devices_dict[device_name] = BluetoothDevice(mac_address=device_info.get('device_address'),
+                                                            name=device_name,
+                                                            minor_type=device_info.get('device_minorType'),
+                                                            connected=True)
+
+    if not_connected_devices is not None:
+        for device in not_connected_devices:
+            for device_name, device_info in device.items():
+                devices_dict[device_name] = BluetoothDevice(mac_address=device_info.get('device_address', 'Unknown'),
+                                                            name=device_name,
+                                                            minor_type=device_info.get('device_minorType', 'Unknown'),
+                                                            connected=False)
+
     return devices_dict
 
 
