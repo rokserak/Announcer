@@ -28,18 +28,32 @@ def get_bluetooth_devices() -> Dict[str, BluetoothDevice]:
         for device in connected_devices:
             for device_name, device_info in device.items():
                 battery_level = int(device_info.get('device_batteryLevelMain', '100%').replace('%', ''))
-                devices_dict[device_name] = BluetoothDevice(mac_address=device_info.get('device_address'),
+                minor_type = device_info.get('device_minorType', None)
+                if minor_type is None:
+                    if 'Apple\xa0Watch' in device_name:
+                        minor_type = 'Apple Watch'
+                    if 'iPhone' in device_name:
+                        minor_type = 'iPhone'
+
+                devices_dict[device_name] = BluetoothDevice(mac_address=device_info.get('device_address', 'Unknown'),
                                                             name=device_name,
-                                                            minor_type=device_info.get('device_minorType'),
+                                                            minor_type=minor_type,
                                                             connected=True,
                                                             battery_level=battery_level)
 
     if not_connected_devices is not None:
         for device in not_connected_devices:
             for device_name, device_info in device.items():
+                minor_type = device_info.get('device_minorType', None)
+                if minor_type is None:
+                    if 'Apple\xa0Watch' in device_name:
+                        minor_type = 'Apple Watch'
+                    if 'iPhone' in device_name:
+                        minor_type = 'iPhone'
+
                 devices_dict[device_name] = BluetoothDevice(mac_address=device_info.get('device_address', 'Unknown'),
                                                             name=device_name,
-                                                            minor_type=device_info.get('device_minorType', 'Unknown'),
+                                                            minor_type=minor_type,
                                                             connected=False)
 
     return devices_dict
@@ -49,8 +63,8 @@ def announcer():
     current_bluetooth_state = get_bluetooth_devices()
     while True:
         new_bluetooth_state = get_bluetooth_devices()
-        for name, new_device_state in new_bluetooth_state.items():
-            current_device_state = current_bluetooth_state.get(name, None)
+        for device_name, new_device_state in new_bluetooth_state.items():
+            current_device_state = current_bluetooth_state.get(device_name, None)
             if not current_device_state or not current_device_state.connected and new_device_state.connected:
                 notification_title = f'{new_device_state.minor_type} Connected'
                 notification_body = f'{new_device_state.name} has been connected'
@@ -64,7 +78,7 @@ def announcer():
                                        f" \"{notification_title}\"'"
                 os.system(notification_command)
 
-            if current_device_state.connected and new_device_state.battery_level <= 10 and \
+            if current_device_state.connected and 0 < new_device_state.battery_level <= 10 and \
                     new_device_state.battery_level < current_device_state.battery_level:
                 notification_title = f'{new_device_state.minor_type} has Low Battery'
                 notification_body = f'{new_device_state.name} has only {new_device_state.battery_level} % Battery left'
